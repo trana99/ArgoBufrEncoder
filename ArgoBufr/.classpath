@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jre8"/>
+	<classpathentry kind="lib" path="lib/joda-time-2.2.jar"/>
+	<classpathentry kind="lib" path="lib/MyFileNameFilter_1.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/netcdfAll-4.3.jar"/>
+	<classpathentry kind="lib" path="lib/JFEP-0.1.0.jar"/>
+	<classpathentry kind="lib" path="C:/Users/trana/javaLib/external/jdbc/ver11.2.0.2/ojdbc6.jar"/>
+	<classpathentry kind="lib" path="C:/Users/trana/javaLib/external/jakarta/log4j/ver1.2.15/log4j.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

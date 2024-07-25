@@ -1,0 +1,14 @@
+#Fat Jar Configuration File
+#Mon Mar 19 13:13:44 EDT 2018
+onejar.license.required=false
+manifest.classpath=
+manifest.removesigners=true
+onejar.checkbox=false
+jarname=writeMedsArgoBufr_fat.jar
+manifest.mergeall=true
+manifest.mainclass=dfo.isdm.WriteArgoBufr.WriteArgoBufr
+manifest.file=<createnew>
+jarname.isextern=false
+onejar.expand=
+excludes=<po|ArgoBufr>~dfo/~isdm/~WriteArgoBufr/~ArgoBufrSection4.txt;<jar|joda-time-2.2.jar>;<jar|netcdfAll-4.3.jar>;<jar|ojdbc6.jar>;<jar|log4j.jar>
+includes=
