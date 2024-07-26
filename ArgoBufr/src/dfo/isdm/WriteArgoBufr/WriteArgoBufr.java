@@ -14,7 +14,9 @@ import java.util.List;
 import java.util.Properties;
 
 
-import org.apache.log4j.Logger;
+//import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
 
 import dfo.isdm.BufrUtility.BufrTable;
 import dfo.isdm.BufrUtility.CreateBufrFile;
@@ -30,7 +32,8 @@ public class WriteArgoBufr {
     /**
      * the logger instance for this class
      */
-    private static Logger log = Logger.getLogger(WriteArgoBufr.class);
+    //private static Logger log = Logger.getLogger(WriteArgoBufr.class);
+    private static final Logger log = LogManager.getLogger(WriteArgoBufr.class);
     private static BufrTable bufrtable;
     private static int dataset;
     private static String bulletinHeader;

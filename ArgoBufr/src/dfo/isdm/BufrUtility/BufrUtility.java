@@ -19,7 +19,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.*;
 import org.jfree.util.Log;
 
 
@@ -51,11 +51,11 @@ public static StringBuffer integerToBinary (String inputsrc, int ilength, Logger
 		    s = BufrUtility.padzerotoleft(s, ilength);
 		  }else if (s.length() > ilength){
 			  s= setMissingValue(ilength);
-			  _log.info("length of the result binary string is " + s.length() + " and longer than allowable length of" 
+			  _log.debug("length of the result binary string is " + s.length() + " and longer than allowable length of" 
 			  + ilength + ".  Hence the value was set value to missing");
 		  }
 	} else {		
-		_log.info("Encode negative value of " + inputsrc);
+		_log.debug(" Encode negative value of " + inputsrc);
 		int pos_ivalue = -1 * ivalue;
 		BigInteger bi = new BigInteger(Integer.toString(pos_ivalue));
 		s = new StringBuffer(bi.toString(2));
@@ -64,7 +64,7 @@ public static StringBuffer integerToBinary (String inputsrc, int ilength, Logger
 			s.replace(0, 1, "1");
 		}else {
 			s = setMissingValue(ilength);
-			_log.info("length of the result binary string is " + s.length() + " and longer than allowable length of" 
+			_log.debug("length of the result binary string is " + s.length() + " and longer than allowable length of" 
 					  + ilength + ".  Hence the value was set value to missing");
 
 		}

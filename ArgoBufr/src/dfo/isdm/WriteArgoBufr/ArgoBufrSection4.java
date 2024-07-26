@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.*;
 import org.mbertoli.jfep.Parser;
 
 import ucar.ma2.Array;
@@ -36,7 +36,7 @@ import ucar.ma2.ArrayFloat;
  * For sequence 3 15 003, the program will only used n_prof equals 1.  For DOXY data, the program won't encode near surface doxy sampling.
  */
 public class ArgoBufrSection4 {
-    private static Logger log = Logger.getLogger(WriteArgoBufr.class);
+    private static Logger log = LogManager.getLogger(WriteArgoBufr.class);
     private  List<Sec3NprofMapDTO> sec3Sequences = new ArrayList <Sec3NprofMapDTO>();
     private static int icoredProf;
     private static String coredFileName;
@@ -137,7 +137,7 @@ public class ArgoBufrSection4 {
     			ncfile = NetcdfFile.open(coredFileName);
     			//n_prof = icoredProf + 1;    			   			
     		}
-			log.info("working on n_prof= " + n_prof);
+    		log.debug("working on n_prof= " + n_prof);
 			List<String>coredDataMode = Utility.getCharD1(NetcdfFile.open(coredFileName), "DATA_MODE", log);
 			List<String>datamode = Utility.getCharD1(ncfile, "DATA_MODE", log);
 			boolean adjustedVariable = false;
@@ -335,7 +335,7 @@ public class ArgoBufrSection4 {
 			List<String> data = getNonMissingValue(profilesValues);
 			//List<String> data = profilesValues;
 			if (data.size() == 0){
-            	log.info("The number of depth for " + _parentDescriptor + " is " + data.size() + ".  Remove " + _parentDescriptor + " from BUFR messages");
+				log.debug("The number of depth for " + _parentDescriptor + " is " + data.size() + ".  Remove " + _parentDescriptor + " from BUFR messages");
             	emptySequences.add(_parentDescriptor.getDescriptorId());            	
             	return sbuf;
             }
@@ -348,13 +348,13 @@ public class ArgoBufrSection4 {
 					if(dto.getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0) {
 						if (dto.getData_array()!= null){
 							int value = dto.getData_array().get(0);
-							log.info("encode " + dto.getDescriptor_child() + " = " + value 
+							log.debug("encode " + dto.getDescriptor_child() + " = " + value 
 									+ "="+BufrUtility.toBinary(
 											Integer.toString(value), dto.getData_width(), dto.getUnits(),log));
 							sbuf.append(BufrUtility.toBinary(
 									Integer.toString(value), dto.getData_width(), dto.getUnits(),log));
 						} else {
-							log.info("encode missing " + dto.getDescriptor_child() + "=" 
+							log.debug("encode missing " + dto.getDescriptor_child() + "=" 
 						+ BufrUtility.setMissingValue(dto.getData_width()));
 							sbuf.append(BufrUtility.setMissingValue(dto.getData_width()));
 						}
@@ -363,13 +363,13 @@ public class ArgoBufrSection4 {
 					iDesc++;
 				} else {
 					int numReplicate = bufrTable.getNumDescriptorToReplicate(_descriptor);
-					log.info("number of descriptor to replicate " + numReplicate);
+					log.debug("number of descriptor to replicate " + numReplicate);
 					if (bufrTable.isDelayedReplicator(
 							childDesc.get(iDesc + 1).getDescriptor_child())){
-						log.info("get descriptor: " + childDesc.get(iDesc + 1).getDescriptor_child());
+						log.debug("get descriptor: " + childDesc.get(iDesc + 1).getDescriptor_child());
 						int nodepths = delayedReplicatorDto.getData_array().get(0);
 						
-						log.info("encode " + childDesc.get(iDesc + 1).getDescriptor_child() + "=" + nodepths + " =" 
+						log.debug("encode " + childDesc.get(iDesc + 1).getDescriptor_child() + "=" + nodepths + " =" 
 						+ BufrUtility.toBinary(Integer.toString(nodepths),
 								childDesc.get(iDesc + 1).getData_width(),
 								childDesc.get(iDesc+1).getUnits(),log));
@@ -384,7 +384,7 @@ public class ArgoBufrSection4 {
 								if (profileDto.getData_array() != null){
 									String []s = data.get(idepth).split(",");
 									if (s[sLoc].compareToIgnoreCase("MISSING")!=0) {
-										log.info("encode " + profileDto.getDescriptor_child() + "="
+										log.debug("encode " + profileDto.getDescriptor_child() + "="
 												+ s[sLoc] +"="
 												+ BufrUtility.toBinary(s[sLoc],										
 														profileDto.getData_width(), profileDto.getUnits(),log) );
@@ -399,17 +399,17 @@ public class ArgoBufrSection4 {
 									sLoc++;
 								} else {
 									if (profileDto.getForced_missing() == 'Y'){										
-										/*log.info("encode " + profileDto.getDescriptor_id() + "="+ profileDto.getDescriptor_child() + "=" 
+										log.debug("encode " + profileDto.getDescriptor_id() + "="+ profileDto.getDescriptor_child() + "=" 
 												+BufrUtility.toBinary(
 											Integer.toString(profileDto.getForced_value()),
 											profileDto.getData_width(), profileDto.getUnits(),log)
-												 );	*/									
+												 );										
 										sbuf.append(BufrUtility.toBinary(
 												Integer.toString(profileDto.getForced_value()),
 												profileDto.getData_width(), profileDto.getUnits(),log));
 									} else {
-										/*log.info("encode " + profileDto.getDescriptor_child() + "=" 
-									+ BufrUtility.setMissingValue(profileDto.getData_width()) ); */
+										log.debug("encode " + profileDto.getDescriptor_child() + "=" 
+									+ BufrUtility.setMissingValue(profileDto.getData_width()) ); 
 										
 										sbuf.append(BufrUtility.setMissingValue(profileDto.getData_width()));
 									}
@@ -438,7 +438,7 @@ public class ArgoBufrSection4 {
 				}
 				
 			}
-			log.info("Completed encoding " + _parentDescriptor + " descriptor "
+			log.info("Completed encoding " + _parentDescriptor.getDescriptorId() + " descriptor "
 	                + " and total length = "
 	                + sbuf.length() + " bits");			
 		} catch (IOException e) {
@@ -914,7 +914,6 @@ public class ArgoBufrSection4 {
             List<Double> julday = Utility.getDoubleD1(ncprof, "JULD", log);
             String obsdate = Utility.convertJulianToDate(julday.get(icoredProf),
                 referencedt);
-            log.info(obsdate);
             buf4.append(BufrUtility.integerToBinary(obsdate
                 .substring(0, 4).trim(), 
                 bufrTable.getDescriptorDto("004001").getData_width(),log));
@@ -1167,7 +1166,7 @@ public class ArgoBufrSection4 {
                 buf4.append(BufrUtility
                         .integerToBinary(s[sloc], 
                         		bufrTable.getDescriptorDto("007065").getData_width(),log));
-                log.info("007065 = " + s[sloc] + " = " + bufrTable.getDescriptorDto("007065").getData_width() + " " 
+                log.debug("007065 = " + s[sloc] + " = " + bufrTable.getDescriptorDto("007065").getData_width() + " " 
                         		+ BufrUtility.integerToBinary(s[sloc], 
                         		bufrTable.getDescriptorDto("007065").getData_width(),log));
 
@@ -1183,7 +1182,7 @@ public class ArgoBufrSection4 {
             if (s[sloc].compareToIgnoreCase("MISSING")!= 0){
                 buf4.append(BufrUtility
                         .integerToBinary(s[sloc], bufrTable.getDescriptorDto("022045").getData_width(),log));
-                log.info("022045 = " +  s[sloc] + " = " + bufrTable.getDescriptorDto("022045").getData_width() + " " + BufrUtility
+                log.debug("022045 = " +  s[sloc] + " = " + bufrTable.getDescriptorDto("022045").getData_width() + " " + BufrUtility
                         .integerToBinary(s[sloc], 
                         		bufrTable.getDescriptorDto("022045").getData_width(),log));
 
@@ -1202,7 +1201,7 @@ public class ArgoBufrSection4 {
             	buf4.append(BufrUtility
                         .integerToBinary(s[sloc],
                         		bufrTable.getDescriptorDto("022064").getData_width(),log));
-               log.info("022064 = " + s[sloc] + " = " +   BufrUtility
+            	log.debug("022064 = " + s[sloc] + " = " +   BufrUtility
                         .integerToBinary(s[sloc], 
                         		bufrTable.getDescriptorDto("022064").getData_width(), log));
 

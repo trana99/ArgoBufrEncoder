@@ -6,7 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.*;
 
 
 

@@ -14,7 +14,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.*;
 
 import dfo.isdm.BufrUtility.BufrUtility;
 
@@ -26,7 +26,7 @@ import dfo.isdm.BufrUtility.BufrUtility;
  * Window&gt;Preferences&gt;Java&gt;Code Generation&gt;Code and Comments
  */
 public class ArgoBufrSection1 {
-    private static Logger log = Logger.getLogger(WriteArgoBufr.class);
+    private static Logger log = LogManager.getLogger(WriteArgoBufr.class);
 
 /**
  * constructor class for encode section 1

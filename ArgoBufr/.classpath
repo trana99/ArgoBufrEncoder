@@ -7,6 +7,7 @@
 	<classpathentry kind="lib" path="lib/netcdfAll-4.3.jar"/>
 	<classpathentry kind="lib" path="lib/JFEP-0.1.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/trana/javaLib/external/jdbc/ver11.2.0.2/ojdbc6.jar"/>
-	<classpathentry kind="lib" path="C:/Users/trana/javaLib/external/jakarta/log4j/ver1.2.15/log4j.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-api-2.23.1.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-core-2.23.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

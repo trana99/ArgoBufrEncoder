@@ -9,7 +9,7 @@ package dfo.isdm.WriteArgoBufr;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.*;
 
 import dfo.isdm.BufrUtility.BufrUtility;
 import dfo.isdm.BufrUtility.Sec3NprofMapDTO;
@@ -22,7 +22,7 @@ import dfo.isdm.BufrUtility.Sec3NprofMapDTO;
  * Jan 2022, Tran modified the sec3Sequences from the list of String to the list of Sec3NprofMapDTO so that it's consistent with ArgoBufrSection4 class
  */
 public class SetBufrSection3  {
-    private static Logger log = Logger.getLogger(WriteArgoBufr.class);
+    private static Logger log = LogManager.getLogger(WriteArgoBufr.class);
     private static List<Sec3NprofMapDTO> sec3Sequences = new ArrayList <Sec3NprofMapDTO>();
     private static StringBuffer sec3;
     private static int noDataSet;
