@@ -56,7 +56,7 @@ public StringBuffer encodeSection1() {
 // local data sub-category
     sec1.append(BufrUtility.integerToBinary("0", 8, log));
 // Master table
-    sec1.append(BufrUtility.integerToBinary("25", 8, log));
+    sec1.append(BufrUtility.integerToBinary("41", 8, log));
 // version of local table
     sec1.append(BufrUtility.integerToBinary("0", 8, log));
     // GMT date
