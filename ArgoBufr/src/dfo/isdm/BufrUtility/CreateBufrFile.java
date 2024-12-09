@@ -81,7 +81,7 @@ public final class CreateBufrFile {
 	        } else {
 	            log.info("Total Bufr length is more than 500000 octets "
 	                + totaloctet);
-	            log.info("BUFR not created !!!!!");
+	            log.error("BUFR not created !!!!!");
 	        }
 
 

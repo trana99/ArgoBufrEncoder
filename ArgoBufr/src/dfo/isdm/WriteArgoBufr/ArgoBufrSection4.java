@@ -13,16 +13,16 @@ import dfo.isdm.BufrUtility.Utility;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.logging.log4j.*;
 import org.mbertoli.jfep.Parser;
 
 import ucar.ma2.Array;
 import ucar.ma2.ArrayChar;
-import ucar.ma2.ArrayChar.D2;
 import ucar.ma2.DataType;
 import ucar.nc2.Attribute;
 import ucar.nc2.Dimension;
@@ -41,9 +41,10 @@ public class ArgoBufrSection4 {
     private static int icoredProf;
     private static String coredFileName;
     private static String BFileName;;
-    private static BufrTable bufrTable;
     private static StringBuffer sbuf4;
-    private List<String> emptySequences = new ArrayList<String>();
+    private List<Sec3NprofMapDTO> emptySequences = new ArrayList<Sec3NprofMapDTO>();
+    private static BufrTable bufrSequences= null;
+    private static List<BufrDescriptorDto>childDesc = new ArrayList<BufrDescriptorDto>();
     
 
     /**
@@ -52,21 +53,24 @@ public class ArgoBufrSection4 {
     public ArgoBufrSection4(String _ncCoreFile, String _ncBFile, boolean _auxData, BufrTable _bufrTable) {
     	coredFileName = _ncCoreFile;
     	BFileName = _ncBFile;
-    	bufrTable = _bufrTable;
+    	bufrSequences = _bufrTable;
     	sec3Sequences = new ArrayList<Sec3NprofMapDTO>();
     	getArgoBufrSequences(_auxData);
     	sbuf4 = new StringBuffer();
+    	emptySequences = new ArrayList<Sec3NprofMapDTO>();
     	for (int i = 0; i < sec3Sequences.size(); i++){
-    		if (sec3Sequences.get(i).getDescriptorId().compareToIgnoreCase("315003")==0){  	
+    		if (sec3Sequences.get(i).getDescriptorId().compareToIgnoreCase("315003")==0){ 
+    			log.info("Encode section " + sec3Sequences.get(i).getDescriptorId());
     			sbuf4.append(encode_315003());    			
     		}else  {
-    			log.info("Encode section " + sec3Sequences.get(i).getDescriptorId());
+    			log.debug("Encode section " + sec3Sequences.get(i).getDescriptorId() );    			
     			StringBuffer nonCoredData = encode_nonCoredData(sec3Sequences.get(i));
     			sbuf4.append(nonCoredData);
     		} 
     	}
-    	if (emptySequences.size()>0){
+    	if (emptySequences.size() > 0) {
     		sec3Sequences.removeAll(emptySequences);
+    		log.info("Remove an empty sequence");
     	}
     	log.info("Section 4 length without zeros padding" + sbuf4.length()/8 + " octets" + " and" + sbuf4.length() + " bits");
     }
@@ -80,7 +84,6 @@ public class ArgoBufrSection4 {
 	}
 
 	private StringBuffer encode_nonCoredData(Sec3NprofMapDTO _parentDescriptor) {
-		List<BufrDescriptorDto> childDesc = bufrTable.getChildSubset(_parentDescriptor.getDescriptorId());
 		StringBuffer sbuf = new StringBuffer();
 		BufrDescriptorDto dto;
 		BufrDescriptorDto delayedReplicatorDto = null;
@@ -92,10 +95,9 @@ public class ArgoBufrSection4 {
       //  DecimalFormat nonPresFormat = new DecimalFormat("#####.000");
         DecimalFormat bufrnumFormat = new DecimalFormat("#");
 		List<String>profilesValues= new ArrayList<String>();
-		int ibgcprof=-1;
+		//int ibgcprof=-1;
 		// check to see if there is any descriptor operators and change the data width and scale if applicable
-		List<BufrDescriptorDto> modified_childDesc = modifiedDescriptorValue(childDesc);
-		childDesc = modified_childDesc;
+		childDesc = bufrSequences.modifiedDescriptorValue(_parentDescriptor.getDescriptorId());
 		try {
     		if (_parentDescriptor.getDescriptorId().compareTo("306044")== 0 
     				||_parentDescriptor.getDescriptorId().compareTo("306045")== 0
@@ -106,7 +108,7 @@ public class ArgoBufrSection4 {
     				BFileName = coredFileName;
     			}
     			bgc = true;
-    			log.info("working on file " + BFileName);
+    			log.info("Encode sequence " + _parentDescriptor.getDescriptorId() + " using file " + BFileName);
 				ncfile = NetcdfFile.open(BFileName);
 				ncIcored = NetcdfFile.open(coredFileName);
 		        ArrayChar.D3 paramArray = Utility.getCharD3Array(ncfile,
@@ -127,28 +129,23 @@ public class ArgoBufrSection4 {
 		                    		|| profName.toString().trim().compareToIgnoreCase("PH_IN_SITU_TOTAL")==0
 		                    		){
 		                    	//n_prof = i;
-		                    	ibgcprof = j;
+		                    	//ibgcprof = j;		                    	
 		                    }		                    
 		                    profName.delete(0, parashape[2]);
 		                }
 		            }
     		} else {
-    			log.info("working on file " + coredFileName);
+    			log.info("Encode sequence " + _parentDescriptor.getDescriptorId() + "using file " + coredFileName);
     			ncfile = NetcdfFile.open(coredFileName);
     			//n_prof = icoredProf + 1;    			   			
     		}
-    		log.debug("working on n_prof= " + n_prof);
+    		log.debug("working on n_prof " + n_prof);
 			List<String>coredDataMode = Utility.getCharD1(NetcdfFile.open(coredFileName), "DATA_MODE", log);
 			List<String>datamode = Utility.getCharD1(ncfile, "DATA_MODE", log);
 			boolean adjustedVariable = false;
 			if (datamode.get(n_prof).compareToIgnoreCase("R")!=0){
 				adjustedVariable = true;
 			}
-			ArrayChar.D2 paramDataMode = null;
-			if (ncfile.findVariable("PARAMETER_DATA_MODE")!= null){
-				paramDataMode = (ArrayChar.D2)ncfile.findVariable("PARAMETER_DATA_MODE").read();
-			}
-			
 			
 			for (int k = 0 ; k < childDesc.size(); k++) {
 				dto = childDesc.get(k);
@@ -166,7 +163,7 @@ public class ArgoBufrSection4 {
 					reference_values.add(dto.getReference());
 					dto.setData_array(reference_values);
 				}
-				if (bufrTable.isDelayedReplicator(dto.getDescriptor_child())){
+				if (bufrSequences.isDelayedReplicator(dto.getDescriptor_child())){
 					delayedReplicatorDto = dto;
 				}
 				if (dto.getNetcdf_variable().trim().length() > 0){
@@ -191,7 +188,6 @@ public class ArgoBufrSection4 {
 
 					if (adjustedVariable) {
 						if (ncvarName.contains("_QC")){							
-							//ncvarName = dto.getNetcdf_variable().trim().split("_")[0].concat("_ADJUSTED_QC");
 							ncvarName = dto.getNetcdf_variable().trim().replace("_QC", "_ADJUSTED_QC");
 						} else if (!ncvarName.contains("_QC") && !ncvarName.contains("N_LEVELS")
 								&& !ncvarName.contains("VERTICAL_SAMPLING_SCHEME")){
@@ -203,7 +199,9 @@ public class ArgoBufrSection4 {
 						ncvar = ncIcored.findVariable(ncvarName.toUpperCase());
 					}
 					// get the profile data (pres, temp, psal, pres_qc, temp_qc, psal_qc etc)
-					if (ncvar != null && ncvar.getDimensions().size()==2){						
+					if (ncvar != null && ncvar.getDimensions().size()==2){
+						log.info(" Read data from variable :" + ncvar.getFullName());
+
 						Array profileValue = ncvar.read();
 						if (ncvar.getDataType() != DataType.CHAR){			                
 			                ArrayFloat.D2 profileArray = (ArrayFloat.D2) profileValue;
@@ -214,8 +212,10 @@ public class ArgoBufrSection4 {
 			                List<Integer> data = new ArrayList<Integer>();
 			                int totalDepth = 0;
 			                String sValue= "MISSING";
+			                
 			                for (int j = 0; j < shape[1]; j++) {
 			                	float value = profileArray.get(n_prof, j);
+			                	StringBuffer sval = new StringBuffer();
 			                	if (value != fill.floatValue()){
 			                		double val = value;			                		
 			                		if (eqFromNcToBufr.length() > 0 ){
@@ -223,8 +223,10 @@ public class ArgoBufrSection4 {
 										parser.setVariable("x", (double)value );						
 										val =  ((parser.getValue() 
 												* java.lang.Math.pow(10, dto.getScale())) - dto.getReference());
+										sval = BufrUtility.toBinary(bufrnumFormat.format(val), dto.getData_width(), dto.getUnits(),log);
 				                	}
-			                		if (val >= 0) {
+			                		if (val >= 0 
+			                				&& (sval.toString().compareToIgnoreCase(BufrUtility.setMissingValue(dto.getData_width()).toString()))!= 0) {
 				                		sValue=bufrnumFormat.format(val);
 				                		data.add(Integer.parseInt(bufrnumFormat.format(val)));
 				                		totalDepth++;
@@ -332,18 +334,22 @@ public class ArgoBufrSection4 {
 
 			// convert data to binary 
 			//Get all data whether or not it's missing
+			log.debug("Working on " + _parentDescriptor.getDescriptorId());
 			List<String> data = getNonMissingValue(profilesValues);
 			//List<String> data = profilesValues;
 			if (data.size() == 0){
-				log.debug("The number of depth for " + _parentDescriptor + " is " + data.size() + ".  Remove " + _parentDescriptor + " from BUFR messages");
-            	emptySequences.add(_parentDescriptor.getDescriptorId());            	
+				log.info("The number of depth for " + _parentDescriptor.getDescriptorId() + " is " + data.size() + ".  Remove " + _parentDescriptor.getDescriptorId() + " from BUFR messages...");
+            	emptySequences.add(_parentDescriptor);            	
             	return sbuf;
+            } else {
+				log.info("The number of depth for " + _parentDescriptor.getDescriptorId() + " is " + data.size() + ".  Encode " + _parentDescriptor.getDescriptorId() + " into BUFR messages...");
+
             }
 			int iDesc = 0; 
 			while (iDesc < childDesc.size()){			
 				dto = childDesc.get(iDesc);
 				String _descriptor = dto.getDescriptor_child();
-				if (!bufrTable.isSimpleReplicator(dto.getDescriptor_child())) { 
+				if (!bufrSequences.isSimpleReplicator(dto.getDescriptor_child())) { 
 						//&& dto.getMeds_pcode().compareToIgnoreCase("IGNORE")!=0) {
 					if(dto.getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0) {
 						if (dto.getData_array()!= null){
@@ -362,9 +368,9 @@ public class ArgoBufrSection4 {
 					}
 					iDesc++;
 				} else {
-					int numReplicate = bufrTable.getNumDescriptorToReplicate(_descriptor);
+					int numReplicate = bufrSequences.getNumDescriptorToReplicate(_descriptor);
 					log.debug("number of descriptor to replicate " + numReplicate);
-					if (bufrTable.isDelayedReplicator(
+					if (bufrSequences.isDelayedReplicator(
 							childDesc.get(iDesc + 1).getDescriptor_child())){
 						log.debug("get descriptor: " + childDesc.get(iDesc + 1).getDescriptor_child());
 						int nodepths = delayedReplicatorDto.getData_array().get(0);
@@ -384,13 +390,14 @@ public class ArgoBufrSection4 {
 								if (profileDto.getData_array() != null){
 									String []s = data.get(idepth).split(",");
 									if (s[sLoc].compareToIgnoreCase("MISSING")!=0) {
+											sbuf.append(BufrUtility.toBinary(s[sLoc], 
+													profileDto.getData_width(), profileDto.getUnits(),log));
+										if (profileDto.getDescriptor_child().compareToIgnoreCase("022188")==0) {
 										log.debug("encode " + profileDto.getDescriptor_child() + "="
 												+ s[sLoc] +"="
 												+ BufrUtility.toBinary(s[sLoc],										
-														profileDto.getData_width(), profileDto.getUnits(),log) );
+														profileDto.getData_width(), profileDto.getUnits(),log) );}
 													
-													sbuf.append(BufrUtility.toBinary(s[sLoc], 
-															profileDto.getData_width(), profileDto.getUnits(),log));
 
 									} else {
 										//log.info("encode " + profileDto.getDescriptor_child() + "=" + s[sLoc]);
@@ -398,18 +405,20 @@ public class ArgoBufrSection4 {
 									}
 									sLoc++;
 								} else {
-									if (profileDto.getForced_missing() == 'Y'){										
+									if (profileDto.getForced_missing() == 'Y'){
+										/*
 										log.debug("encode " + profileDto.getDescriptor_id() + "="+ profileDto.getDescriptor_child() + "=" 
 												+BufrUtility.toBinary(
 											Integer.toString(profileDto.getForced_value()),
 											profileDto.getData_width(), profileDto.getUnits(),log)
-												 );										
+												 );	*/									
 										sbuf.append(BufrUtility.toBinary(
 												Integer.toString(profileDto.getForced_value()),
 												profileDto.getData_width(), profileDto.getUnits(),log));
 									} else {
+										/*
 										log.debug("encode " + profileDto.getDescriptor_child() + "=" 
-									+ BufrUtility.setMissingValue(profileDto.getData_width()) ); 
+									+ BufrUtility.setMissingValue(profileDto.getData_width()) ); */
 										
 										sbuf.append(BufrUtility.setMissingValue(profileDto.getData_width()));
 									}
@@ -449,89 +458,15 @@ public class ArgoBufrSection4 {
 	}
 
 
-	private List<BufrDescriptorDto> modifiedDescriptorValue(List<BufrDescriptorDto> childDesc) {
-		List<BufrDescriptorDto>modified_desc = new ArrayList<BufrDescriptorDto>();
-		int ref_value = 0;
-		int delta_data_width = 0;
-		int delta_scale =0;
-		Hashtable<String, Integer> nreference_value = new Hashtable<String, Integer> ();
-		Hashtable<String, Integer> ndelta_data_width = new Hashtable<String, Integer> ();
-		Hashtable<String, Integer> ndelta_scale = new Hashtable<String, Integer> ();
-		boolean startRef = false; // start to change the data reference for the subsequence sequences until stop
-		boolean startcdw = false;// start to change the data width for the subsequence sequences until stop
-		boolean startcs = false;// start to change the data scale for the subsequence sequences until stop
-		for (int i = 0; i < childDesc.size(); i++) {
-			if (childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("203")==0
-					&& childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("255")!= 0) {
-				ref_value = childDesc.get(i).getReference();				
-				startRef = true;
-			}
-			if (childDesc.get(i).getDescriptor_child().compareToIgnoreCase("203255")==0) {
-				startRef = false;				
-			}
-			if (childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("201")==0
-					&& childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("000")!= 0) {
-				delta_data_width = bufrTable.getOperandYYY(childDesc.get(i).getDescriptor_child());
-				startcdw = true;
-			}
-			if (childDesc.get(i).getDescriptor_child().compareToIgnoreCase("201000")==0) {
-				startcdw = false;				
-			}
-			if (childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("202")==0
-					&& childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("000")!= 0) {
-				delta_scale = bufrTable.getOperandYYY(childDesc.get(i).getDescriptor_child());					
-				startcs = true;
-			}
-			if (childDesc.get(i).getDescriptor_child().compareToIgnoreCase("202000")==0) {
-				startcs = false;				
-			}
-			
-			if (startRef && !bufrTable.isSimpleReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isDelayedReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isOperatorDescriptor(childDesc.get(i).getDescriptor_child())) {
-				nreference_value.put(childDesc.get(i).getDescriptor_child(), ref_value);
-			}
-			if (startcdw && !bufrTable.isSimpleReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isDelayedReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isOperatorDescriptor(childDesc.get(i).getDescriptor_child())) {
-				ndelta_data_width.put(childDesc.get(i).getDescriptor_child(), delta_data_width);
-			}
-			if (startcs && !bufrTable.isSimpleReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isDelayedReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isOperatorDescriptor(childDesc.get(i).getDescriptor_child())) {
-				ndelta_scale.put(childDesc.get(i).getDescriptor_child(), delta_data_width);
-			}
 
-		}
-		
-		for (int i =0; i < childDesc.size(); i++) {
-			BufrDescriptorDto bu_dto = childDesc.get(i);
-			if (!bufrTable.isSimpleReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isDelayedReplicator(childDesc.get(i).getDescriptor_child())
-					&& !bufrTable.isOperatorDescriptor(childDesc.get(i).getDescriptor_child())) {
-				if (nreference_value.containsKey(childDesc.get(i).getDescriptor_child()) 
-						&& childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
-					bu_dto.setReference(nreference_value.get(childDesc.get(i).getDescriptor_child()));
-				}
-				if (ndelta_data_width.containsKey(childDesc.get(i).getDescriptor_child())
-						&& childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
-					bu_dto.setData_width(bu_dto.getData_width() + ndelta_data_width.get(childDesc.get(i).getDescriptor_child()));
-				}
-				if (ndelta_scale.containsKey(childDesc.get(i).getDescriptor_child())
-						&& childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
-					bu_dto.setScale(bu_dto.getScale() + ndelta_scale.get(childDesc.get(i).getDescriptor_child()));
-				}
-			}
-			modified_desc.add(bu_dto);
-		}
-		return modified_desc;
-	}
 
 	private List<String> getNonMissingValue(List<String> profilesValues) {
 		List<String> unique = new ArrayList<String>();
 		for (int i = 0; i < profilesValues.size(); i++){
+			
 			if (!profilesValues.get(i).contains("MISSING")) {
 				unique.add(profilesValues.get(i));
+				//System.out.println(profilesValues.get(i));
 			}
 			//if (profilesValues.get(i).compareToIgnoreCase("MISSING,15,MISSING,15,MISSING,15,")!= 0) {
 				
@@ -569,7 +504,8 @@ public class ArgoBufrSection4 {
 	            }
 	            if (i==0 ){
 	            	if (paraname.containsAll(presTempPsal)
-	            			&& isProfileDataValid(ncfile,i, "PRES") && isProfileDataValid(ncfile,i, "TEMP")
+	            			&& isProfileDataValid(ncfile,i, "PRES") 
+	            			&& isProfileDataValid(ncfile,i, "TEMP")
 	            			|| isProfileDataValid(ncfile, i, "PSAL")){
 	            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 	            		sec3_dto.setDescriptorId("315003");
@@ -596,7 +532,8 @@ public class ArgoBufrSection4 {
 
 	            		if (verticalSamplingScheme.get(i).trim().startsWith("Near-surface sampling:")) {
 			            	if (paraname.containsAll(nearPresTemp) 
-			            			&& isProfileDataValid(ncfile,i, "PRES") && isProfileDataValid(ncfile,i, "TEMP")
+			            			&& isProfileDataValid(ncfile,i, "PRES") 
+			            			&& isProfileDataValid(ncfile,i, "TEMP")
 			            			&& !isProfileDataValid(ncfile, i, "PSAL")){
 			            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 			            		sec3_dto.setDescriptorId("306017");
@@ -604,13 +541,15 @@ public class ArgoBufrSection4 {
 			            		sec3Sequences.add(sec3_dto);
 			            	} else if  (paraname.containsAll(presTempPsal)) {
 			            		if (isProfileDataValid(ncfile,i, "PRES")
-			            				&& isProfileDataValid(ncfile, i, "TEMP") && isProfileDataValid(ncfile, i, "PSAL")){
+			            				&& isProfileDataValid(ncfile, i, "TEMP") 
+			            				&& isProfileDataValid(ncfile, i, "PSAL")){
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306018");
 				            		sec3_dto.setNprof(i);
 				            		sec3Sequences.add(sec3_dto);
 			            		} else if (isProfileDataValid(ncfile,i, "PRES") 
-			            				&& isProfileDataValid(ncfile, i, "TEMP") && !isProfileDataValid(ncfile, i, "PSAL")){
+			            				&& isProfileDataValid(ncfile, i, "TEMP") 
+			            				&& !isProfileDataValid(ncfile, i, "PSAL")){
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306017");
 				            		sec3_dto.setNprof(i);
@@ -618,25 +557,30 @@ public class ArgoBufrSection4 {
 			            		}
 			            	} 
 	            		}
-		    	        if (BFileName != null){
+	            	  }
+	            	}
+		    	    if (auxData && BFileName != null){
 		    	        	NetcdfFile bfile = NetcdfFile.open(BFileName);
 		    				List<String> b_paraname = Utility.getCharD3Array_List(bfile,
 		    			            "STATION_PARAMETERS", log).get(i);
-		    				for (int k = 0; k < b_paraname.size(); k++) {
-		    					if (b_paraname.get(k).compareToIgnoreCase("DOXY")==0 && isProfileDataValid(bfile,i, "DOXY_ADJUSTED")) {
+		    				for (int k = 0; k < b_paraname.size(); k++) {		    					
+		    					if (b_paraname.get(k).compareToIgnoreCase("DOXY")==0 
+		    							&& isProfileDataValid(bfile,i, "DOXY_ADJUSTED")) {
 		    						//	&& isProfileDataValid(bfile,i, "PRES_ADJUSTED")) {
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306044");
 				            		sec3_dto.setNprof(i);
 				            		sec3Sequences.add(sec3_dto);
-		    					} else if (b_paraname.get(k).compareToIgnoreCase("CHLA")==0 && isProfileDataValid(bfile,i, "CHLA_ADJUSTED")) {
+		    					} else if (b_paraname.get(k).compareToIgnoreCase("CHLA")==0 
+		    							&& isProfileDataValid(bfile,i, "CHLA_ADJUSTED")) {
 		    							//&& isNotFillValueArray(ncfile,i, "PRES_ADJUSTED")) {
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306045");
 				            		sec3_dto.setNprof(i);
 				            		sec3Sequences.add(sec3_dto);
 
-		    					} else if (b_paraname.get(k).compareToIgnoreCase("NITRATE")==0 && isProfileDataValid(bfile,i, "NITRATE_ADJUSTED")) {
+		    					} else if (b_paraname.get(k).compareToIgnoreCase("NITRATE")==0
+		    							&& isProfileDataValid(bfile,i, "NITRATE_ADJUSTED")) {
 		    							//&& isProfileDataValid(ncfile,i, "PRES_ADJUSTED")) {
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306046");
@@ -650,7 +594,8 @@ public class ArgoBufrSection4 {
 				            		sec3_dto.setDescriptorId("306047");
 				            		sec3_dto.setNprof(i);
 				            		sec3Sequences.add(sec3_dto);
-		    					} else if (b_paraname.get(k).compareToIgnoreCase("BBP700")==0 && isNotFillValueArray(bfile,i, "BBP700_ADJUSTED")) {
+		    					} else if (b_paraname.get(k).compareToIgnoreCase("BBP700")==0 
+		    							&& isProfileDataValid(bfile,i, "BBP700_ADJUSTED")) {
 		    							//&& isNotFillValueArray(ncfile,i, "PRES_ADJUSTED")) {
 				            		Sec3NprofMapDTO sec3_dto = new Sec3NprofMapDTO();
 				            		sec3_dto.setDescriptorId("306048");
@@ -658,8 +603,8 @@ public class ArgoBufrSection4 {
 				            		sec3Sequences.add(sec3_dto);
 		    					} 
 		    				}
-			            }
-	            	}
+			            
+	            	
 	            	
 	            }
 	        }
@@ -673,72 +618,13 @@ public class ArgoBufrSection4 {
 		
 	}
 
-	private boolean isNotFillValueArray(NetcdfFile ncfile, int n_prof, String profileName) {
-		boolean validData = false;		
-		if (ncfile.findVariable(profileName)!= null){		
-			try {
-				Variable dataMode = ncfile.findVariable("DATA_MODE");
-				Array dataModeValue = dataMode.read();
-				ArrayChar.D1 datamodeArray = (ArrayChar.D1) dataModeValue;
-				if (ncfile.findVariable("PARAMETER_DATA_MODE") != null){					
-					ArrayChar.D2 paramDataMode = (ArrayChar.D2) ncfile.findVariable("PARAMETER_DATA_MODE").read();
-					ArrayChar.D3 stationParameters = (ArrayChar.D3)ncfile.findVariable("STATION_PARAMETERS").read();
-					int []shape = stationParameters.getShape();
-					for (int i = 0; i < shape[1]; i++){
-						StringBuffer sbf = new StringBuffer();
-						for (int j = 0; j < shape[2];j++){
-							sbf.append(stationParameters.get(n_prof, i, j));
-						}						
-						if (sbf.toString().trim().compareToIgnoreCase(profileName)==0){
-							if (paramDataMode.get(n_prof, i)=='A'||paramDataMode.get(n_prof, i)=='a'){
-								profileName = profileName.concat("_ADJUSTED");
-							} else if (paramDataMode.get(n_prof, i)=='R'||paramDataMode.get(n_prof, i)=='r'
-									&& profileName.compareToIgnoreCase("TEMP")!= 0 && profileName.compareToIgnoreCase("PSAL")!= 0){
-								profileName = profileName.concat("_ADJUSTED");
-								
-							}
-						}
-					}		
-				} else {
-					if (datamodeArray.get(n_prof)=='A'|| datamodeArray.get(n_prof) == 'a'){
-						profileName = profileName.concat("_ADJUSTED");
-					} else {
-						if (profileName.trim().compareToIgnoreCase("TEMP")!= 0 
-								&& profileName.trim().compareToIgnoreCase("PSAL") != 0
-								&& profileName.trim().compareToIgnoreCase("PRES") != 0) {
-							profileName = profileName.trim().concat("_ADJUSTED");
-						}
-					}
-				}
-				Variable ncvar = ncfile.findVariable(profileName.trim().toUpperCase());
-				Array profileValue = ncvar.read();
-		        ArrayFloat.D2 profileArray = (ArrayFloat.D2) profileValue;
-		        Attribute fillValue = ncvar
-		                .findAttribute("_FillValue");
-		            Number fill = fillValue.getNumericValue();
-		            int[] shape = profileArray.getShape();
-		            int j = 0;
-		            while (j < shape[1] && !validData) {
-		            	if (profileArray.get(n_prof, j) != fill.floatValue()){
-		            		validData = true;
-		            	}
-		            	j++;
-		            }
-			} catch (IOException e) {
-				log.error("Error reading array:  " + profileName + '\r' + '\n' + e);
-			}
-			
 
-		} 
-
-		return validData;
-	}
 	private boolean isProfileDataValid(NetcdfFile ncfile, int n_prof, String profileName) {
 		boolean valid = false;
 		if (ncfile.findVariable(profileName)!= null){
 			try {
 				Variable ncvar = ncfile.findVariable(profileName.trim().toUpperCase());				 	
-				 Array	profileValue = ncvar.read();
+				Array	profileValue = ncvar.read();
 				ArrayFloat.D2 profileArray = (ArrayFloat.D2)profileValue;
 				Attribute fillValue = ncvar.findAttribute("_FillValue");
 				Number fill = fillValue.getNumericValue();
@@ -750,6 +636,21 @@ public class ArgoBufrSection4 {
 					}
 					j++;
 				}
+				Pattern pattern = Pattern.compile("PRES|TEMP|PSAL", Pattern.CASE_INSENSITIVE);
+				Matcher matcher = pattern.matcher(profileName);
+				if (!matcher.find()) {
+					String non_adjust_profName = profileName.substring(0, profileName.lastIndexOf("ADJUSTED"));
+					Variable profile_param_qc = ncfile.findVariable("PROFILE_".concat(non_adjust_profName).concat("QC"));
+					Array profile_param_qc_value = profile_param_qc.read();
+					ArrayChar.D1 profile_param_qc_array = (ArrayChar.D1) profile_param_qc_value;
+					if (valid  && profile_param_qc_array.get(n_prof)== 'F') {
+						valid = false;
+						log.info("Remove " + profileName + " from BUFR message due to no good adjusted value !!!");
+					}
+
+				}
+
+				
 			} catch (IOException e) {
 				
 				log.error("Error reading array:  " + profileName + '\r' + '\n' + e);
@@ -783,22 +684,23 @@ public class ArgoBufrSection4 {
             
             if (BufrUtility.isNumber(platform.get(icoredProf).trim())) {
                 buf4.append(BufrUtility.integerToBinary(platform.get(0)
-                    .trim(), bufrTable.getDescriptorDto("001087").getData_width(),log));
-                log.info("001087 = " + platform.get(0).trim());
+                    .trim(), bufrSequences.getDescriptorDto("001087").getData_width(),log));
+                log.info("001087 (Platform_number) = " + platform.get(0).trim());
             }
             // fill 001085
             List <String> instruments = Utility.getString2D(ncprof,
                 "PLATFORM_TYPE", log);
+            
            // System.out.println(instrument)
             String instrument = instruments.get(icoredProf).trim();
             if (instrument.length() > 0){
                 buf4.append(BufrUtility.putChar(instrument, 
-                		bufrTable.getDescriptorDto("001085").getData_width()));
+                		bufrSequences.getDescriptorDto("001085").getData_width()));
                         
             } else {
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("001085").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("001085").getData_width()));
             }
-            log.info("001085 = " + instrument);
+            log.info("001085 (Instrument type)= " + instrument);
 
             // fill 001086
             List<String> serialNumbers = Utility.getString2D(ncprof,
@@ -806,14 +708,14 @@ public class ArgoBufrSection4 {
             String serialNumber = serialNumbers.get(icoredProf).trim();
             if (serialNumber.length() > 0){
                 buf4.append(BufrUtility.putChar(serialNumber,
-                		bufrTable.getDescriptorDto("001086").getData_width()));
+                		bufrSequences.getDescriptorDto("001086").getData_width()));
             } else {
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("001086").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("001086").getData_width()));
             }
-            log.info("001086 = " + serialNumber +  " = " + BufrUtility.putChar(serialNumber, 
-            		bufrTable.getDescriptorDto("001086").getData_width()));
+            log.info("001086 (serial number) = " + serialNumber +  " = " + BufrUtility.putChar(serialNumber, 
+            		bufrSequences.getDescriptorDto("001086").getData_width()));
             // fill 002036- buoy type = 2 sub-surface float
-            buf4.append(BufrUtility.integerToBinary("2", bufrTable.getDescriptorDto("002036").getData_width(),log));
+            buf4.append(BufrUtility.integerToBinary("2", bufrSequences.getDescriptorDto("002036").getData_width(),log));
             // fill value for 002148            
             List<String> positionSystems = Utility.getString2D(ncprof,
                 "POSITIONING_SYSTEM", log);
@@ -841,9 +743,9 @@ public class ArgoBufrSection4 {
             	s2148 = "10";
         	}
            buf4.append(BufrUtility.integerToBinary(s2148,
-       			bufrTable.getDescriptorDto("002148").getData_width(),log));
-           log.info("002148" + "=" + s2148 + "="+ BufrUtility.integerToBinary(s2148,
-       			bufrTable.getDescriptorDto("002148").getData_width(),log));
+        		   bufrSequences.getDescriptorDto("002148").getData_width(),log));
+           log.info("002148 (Positionning_sytem)" + "=" + possystem.trim() + " = "+ s2148 + "="+ BufrUtility.integerToBinary(s2148,
+        		   bufrSequences.getDescriptorDto("002148").getData_width(),log));
             // 002149 - type of data buoy = 26: sub-surface Argo float
            String s2149 = "63";
            if (instrument.trim().toUpperCase().startsWith("ALACE") ){
@@ -852,9 +754,11 @@ public class ArgoBufrSection4 {
         	   s2149 = "11";
            } else if (instrument.trim().toUpperCase().startsWith("RAFOS")){
         	   s2149 = "12";
-           } else if (instrument.trim().toUpperCase().startsWith("PROVOR")){
+           } else if (instrument.trim().toUpperCase().startsWith("PROVOR")
+        		   || instrument.trim().toUpperCase().startsWith("ARVOR")){
         	   s2149 = "13";
-           } else if (instrument.trim().toUpperCase().startsWith("SOLO")){
+           } else if (instrument.trim().toUpperCase().startsWith("SOLO")
+        		   ||instrument.trim().toUpperCase().startsWith("S2A")){
         	   s2149 = "14";
            } else if (instrument.trim().toUpperCase().startsWith("APEX")){
         	   s2149 = "15";
@@ -871,43 +775,47 @@ public class ArgoBufrSection4 {
            } else if (instrument.trim().toUpperCase().startsWith("UNSPECIFIED SUB-SURFACE FLOAT")){ 
         	   s2149 = "8";
            } else if (instrument.trim().toUpperCase().startsWith("SUB-SURFACE ARGO FLOAT")
-        		   || instrument.trim().toUpperCase().startsWith("NOVA")){
+        		   || instrument.trim().toUpperCase().startsWith("NOVA")
+        		   || instrument.trim().toUpperCase().startsWith("NAVIS")
+        		   || instrument.trim().toUpperCase().startsWith("ALAMO")){
         	   s2149 = "26";
-           } 
+           } else if (instrument.trim().toUpperCase().startsWith("ITP")||instrument.trim().startsWith("POPS")) {
+        	   s2149 = "30";
+           }
            buf4.append(BufrUtility.integerToBinary(s2149, 
-    			   bufrTable.getDescriptorDto("002149").getData_width(),log));
-           log.info("002149" + "=" + s2149 + "="+ BufrUtility.integerToBinary(s2149,
-       			bufrTable.getDescriptorDto("002149").getData_width(),log));
+        		   bufrSequences.getDescriptorDto("002149").getData_width(),log));
+           log.info("002149 (platform_type) " + "=" +instrument + " = "+ s2149 + "="+ BufrUtility.integerToBinary(s2149,
+        		   bufrSequences.getDescriptorDto("002149").getData_width(),log));
  
             List<Integer> cycleno = Utility.getIntD1(ncprof, "CYCLE_NUMBER", log);
             buf4.append(BufrUtility
                 .integerToBinary(Integer.toString(cycleno.get(icoredProf)), 
-                		bufrTable.getDescriptorDto("022055").getData_width(),log));
-            log.info("022055 = "
-                + Integer.toString(cycleno.get(icoredProf)) + BufrUtility
+                		bufrSequences.getDescriptorDto("022055").getData_width(),log));
+            log.info("022055 (cycle number) = "
+                + Integer.toString(cycleno.get(icoredProf)) + " = " +  BufrUtility
                 .integerToBinary(Integer.toString(cycleno.get(icoredProf)), 
-                		bufrTable.getDescriptorDto("022055").getData_width(),log));
+                		bufrSequences.getDescriptorDto("022055").getData_width(),log));
 
             List<String> directions = Utility.getCharD1(ncprof, "DIRECTION", log);
             String direction = directions.get(icoredProf);
             // fill in value for 022056
             if (direction.trim().compareToIgnoreCase("A") == 0) {
                 buf4.append(BufrUtility.integerToBinary("0",
-                		bufrTable.getDescriptorDto("022056").getData_width(),log));
+                		bufrSequences.getDescriptorDto("022056").getData_width(),log));
 
             } else if (direction.trim().compareToIgnoreCase("D") == 0) {
                 buf4.append(BufrUtility.integerToBinary("1",
-                		bufrTable.getDescriptorDto("022056").getData_width(),log));
+                		bufrSequences.getDescriptorDto("022056").getData_width(),log));
             } else {
                 buf4.append(BufrUtility.integerToBinary("3",
-                		bufrTable.getDescriptorDto("022056").getData_width(),log));
+                		bufrSequences.getDescriptorDto("022056").getData_width(),log));
             }
             // 022067 instrument type for water temp profile measuremnt
             // IxIxIx
             // common code table C-3 (code table 1770)
             List<String> wmoid = Utility.getString2D(ncprof, "WMO_INST_TYPE", log);
             buf4.append(BufrUtility.integerToBinary(wmoid.get(0).trim(),
-            		bufrTable.getDescriptorDto("022067").getData_width(),log));
+            		bufrSequences.getDescriptorDto("022067").getData_width(),log));
 
             // fill date and time in UTC section 301011 and 301012
             String referencedt = ncprof.findVariable("REFERENCE_DATE_TIME").readScalarString();
@@ -916,19 +824,19 @@ public class ArgoBufrSection4 {
                 referencedt);
             buf4.append(BufrUtility.integerToBinary(obsdate
                 .substring(0, 4).trim(), 
-                bufrTable.getDescriptorDto("004001").getData_width(),log));
+                bufrSequences.getDescriptorDto("004001").getData_width(),log));
             buf4.append(BufrUtility.integerToBinary(obsdate
-                .substring(4, 6).trim(), bufrTable.getDescriptorDto("004002").getData_width(),log));
+                .substring(4, 6).trim(),bufrSequences.getDescriptorDto("004002").getData_width(),log));
             buf4.append(BufrUtility.integerToBinary(obsdate
                 .substring(6, 8).trim(),
-                bufrTable.getDescriptorDto("004003").getData_width(),log));
-            log.info("301011 + 301012 = " + obsdate);
+                bufrSequences.getDescriptorDto("004003").getData_width(),log));
+            log.info("301011 + 301012  (JULD) = " + obsdate);
             buf4.append(BufrUtility.integerToBinary(obsdate
                 .substring(8, 10).trim(),
-                bufrTable.getDescriptorDto("004004").getData_width(),log));
+                bufrSequences.getDescriptorDto("004004").getData_width(),log));
             buf4.append(BufrUtility.integerToBinary(obsdate
                 .substring(10, 12).trim(),
-                bufrTable.getDescriptorDto("004005").getData_width(),log));
+                bufrSequences.getDescriptorDto("004005").getData_width(),log));
             // fill location and location flags- 301021-latiude and
             // longitude(high accuracy)
             // 005001 - Latiude (high accuracy, scale 5, reference =
@@ -939,31 +847,31 @@ public class ArgoBufrSection4 {
             double position_fill = ncprof.findVariable("LATITUDE")
             		.findAttribute("_FillValue").getNumericValue().doubleValue();
             if (latitudes.get(icoredProf)==position_fill){
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("005001").getData_width()));
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("006001").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("005001").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("006001").getData_width()));
                 buf4.append(BufrUtility.integerToBinary("20",
-                		bufrTable.getDescriptorDto("008080").getData_width(),log));
+                		bufrSequences.getDescriptorDto("008080").getData_width(),log));
                 List<String> qpos = Utility.getCharD1(ncprof, "POSITION_QC", log);
                 String sqpos = BufrUtility.put033050(qpos.get(icoredProf).trim());
                 buf4.append(BufrUtility.integerToBinary(sqpos, 
-                		bufrTable.getDescriptorDto("033050").getData_width(),log));
+                		bufrSequences.getDescriptorDto("033050").getData_width(),log));
             } else {
                 double lat = latitudes.get(icoredProf)* 100000 - (-9000000);
                 double lon = longitudes.get(icoredProf) * 100000 - (-18000000);
                 buf4.append(BufrUtility.integerToBinary(Integer
                     .toString(Integer.parseInt(numFmt.format(lat))), 
-                    bufrTable.getDescriptorDto("005001").getData_width(),log));
+                    bufrSequences.getDescriptorDto("005001").getData_width(),log));
                 buf4.append(BufrUtility.integerToBinary(Integer
                     .toString(Integer.parseInt(numFmt.format(lon))), 
-                    bufrTable.getDescriptorDto("006001").getData_width(),log));
+                    bufrSequences.getDescriptorDto("006001").getData_width(),log));
                 // fill 008080 - qualifier for quality class, 20: position
                 // 033050 - GTSPP quality class
                 buf4.append(BufrUtility.integerToBinary("20",
-                		bufrTable.getDescriptorDto("008080").getData_width(),log));
+                		bufrSequences.getDescriptorDto("008080").getData_width(),log));
                 List<String> qpos = Utility.getCharD1(ncprof, "POSITION_QC", log);
                 String sqpos = BufrUtility.put033050(qpos.get(icoredProf).trim());
                 buf4.append(BufrUtility.integerToBinary(sqpos, 
-                		bufrTable.getDescriptorDto("033050").getData_width(),log));
+                		bufrSequences.getDescriptorDto("033050").getData_width(),log));
 
             }
             
@@ -1133,7 +1041,7 @@ public class ArgoBufrSection4 {
                         } else {                        	
                         	sValue.append(Integer.toString(BufrUtility.getInteger(
 	                				BufrUtility.setMissingValue(
-	                						bufrTable.getDescriptorDto("033050").getData_width()).toString()))).append(",");
+	                						bufrSequences.getDescriptorDto("033050").getData_width()).toString()))).append(",");
                         }
                         parmqc.delete(0, parmqc.length());
                         if (profilesValues.size() <=j){                			
@@ -1156,7 +1064,7 @@ public class ArgoBufrSection4 {
         //List<String> data = profilesValues;
         buf4.append(BufrUtility
                 .integerToBinary(Integer.toString(data.size()),
-                		bufrTable.getDescriptorDto("031002").getData_width(),log));
+                		bufrSequences.getDescriptorDto("031002").getData_width(),log));
 
         //      add to the Buffer array
         for (int i = 0; i < data.size(); i++) {
@@ -1165,57 +1073,57 @@ public class ArgoBufrSection4 {
         	if (s[sloc].compareToIgnoreCase("MISSING")!= 0){
                 buf4.append(BufrUtility
                         .integerToBinary(s[sloc], 
-                        		bufrTable.getDescriptorDto("007065").getData_width(),log));
-                log.debug("007065 = " + s[sloc] + " = " + bufrTable.getDescriptorDto("007065").getData_width() + " " 
+                        		bufrSequences.getDescriptorDto("007065").getData_width(),log));
+               /* log.debug("007065 = " + s[sloc] + " = " + bufrTable.getDescriptorDto("007065").getData_width() + " " 
                         		+ BufrUtility.integerToBinary(s[sloc], 
-                        		bufrTable.getDescriptorDto("007065").getData_width(),log));
+                        		bufrTable.getDescriptorDto("007065").getData_width(),log));*/
 
         	} else {
-        		buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("007065").getData_width()));
+        		buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("007065").getData_width()));
         	}
             sloc++;
             buf4.append(BufrUtility.integerToBinary("10",
-            		bufrTable.getDescriptorDto("008080").getData_width(),log));
+            		bufrSequences.getDescriptorDto("008080").getData_width(),log));
             buf4.append(BufrUtility.integerToBinary(s[sloc], 
-                    bufrTable.getDescriptorDto("033050").getData_width(),log));
+            		bufrSequences.getDescriptorDto("033050").getData_width(),log));
             sloc++;
             if (s[sloc].compareToIgnoreCase("MISSING")!= 0){
                 buf4.append(BufrUtility
-                        .integerToBinary(s[sloc], bufrTable.getDescriptorDto("022045").getData_width(),log));
-                log.debug("022045 = " +  s[sloc] + " = " + bufrTable.getDescriptorDto("022045").getData_width() + " " + BufrUtility
+                        .integerToBinary(s[sloc], bufrSequences.getDescriptorDto("022045").getData_width(),log));
+                /*log.debug("022045 = " +  s[sloc] + " = " + bufrTable.getDescriptorDto("022045").getData_width() + " " + BufrUtility
                         .integerToBinary(s[sloc], 
-                        		bufrTable.getDescriptorDto("022045").getData_width(),log));
+                        		bufrTable.getDescriptorDto("022045").getData_width(),log));*/
 
 
             } else{
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("022045").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("022045").getData_width()));
             	//log.info("022045= " + s[sloc] + " = " + BufrUtility.setMissingValue(bufrTable.getDescriptorDto("022045").getData_width()));
             }
             sloc++;
             buf4.append(BufrUtility.integerToBinary("11",
-            		bufrTable.getDescriptorDto("008080").getData_width(),log));            
+            		bufrSequences.getDescriptorDto("008080").getData_width(),log));            
             buf4.append(BufrUtility.integerToBinary(s[sloc],
-            		bufrTable.getDescriptorDto("033050").getData_width(),log));
+            		bufrSequences.getDescriptorDto("033050").getData_width(),log));
             sloc++;
             if (s[sloc].compareToIgnoreCase("MISSING")!= 0){
             	buf4.append(BufrUtility
                         .integerToBinary(s[sloc],
-                        		bufrTable.getDescriptorDto("022064").getData_width(),log));
-            	log.debug("022064 = " + s[sloc] + " = " +   BufrUtility
+                        		bufrSequences.getDescriptorDto("022064").getData_width(),log));
+            	/*log.debug("022064 = " + s[sloc] + " = " +   BufrUtility
                         .integerToBinary(s[sloc], 
-                        		bufrTable.getDescriptorDto("022064").getData_width(), log));
+                        		bufrTable.getDescriptorDto("022064").getData_width(), log));*/
 
             } else {
-            	buf4.append(BufrUtility.setMissingValue(bufrTable.getDescriptorDto("022064").getData_width()));
+            	buf4.append(BufrUtility.setMissingValue(bufrSequences.getDescriptorDto("022064").getData_width()));
             //	log.info("022064= " + s[sloc] + " = " +  BufrUtility.setMissingValue(bufrTable.getDescriptorDto("022064").getData_width()));
 
             }
             
             sloc++;
             buf4.append(BufrUtility.integerToBinary("12",
-            		bufrTable.getDescriptorDto("008080").getData_width(),log));
+            		bufrSequences.getDescriptorDto("008080").getData_width(),log));
             buf4.append(BufrUtility.integerToBinary(s[sloc], 
-            		bufrTable.getDescriptorDto("033050").getData_width(),log));
+            		bufrSequences.getDescriptorDto("033050").getData_width(),log));
             sloc++;
         }
         return buf4;

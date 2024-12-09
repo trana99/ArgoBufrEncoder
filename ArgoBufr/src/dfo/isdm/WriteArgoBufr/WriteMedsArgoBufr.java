@@ -4,17 +4,13 @@
  */
 package dfo.isdm.WriteArgoBufr;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 
-import org.apache.logging.log4j.*;
+import org.apache.logging.log4j.Logger;
 
 import dfo.isdm.BufrUtility.BufrTable;
 import dfo.isdm.BufrUtility.CreateBufrFile;
@@ -30,7 +26,7 @@ public class WriteMedsArgoBufr {
     /**
      * the logger instance for this class
      */
-    private static Logger log = LogManager.getLogger(WriteMedsArgoBufr.class);
+	private static Logger log;
     private static BufrTable bufrtable;
     private static int dataset;
     private static String bulletinHeader;
@@ -38,7 +34,6 @@ public class WriteMedsArgoBufr {
     private static String originatorCenterId;
     private static String originatorSubCenterId;
     private static List<Sec3NprofMapDTO>sec3Sequences = new ArrayList<Sec3NprofMapDTO>();
-    private static Properties props;
     private static List<String> fileToBufr;
     private static String outFile;
     private static boolean sendAuxData = true;

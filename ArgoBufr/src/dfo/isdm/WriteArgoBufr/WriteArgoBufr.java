@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-
 //import org.apache.log4j.Logger;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
@@ -34,7 +33,6 @@ public class WriteArgoBufr {
      */
     //private static Logger log = Logger.getLogger(WriteArgoBufr.class);
     private static final Logger log = LogManager.getLogger(WriteArgoBufr.class);
-    private static BufrTable bufrtable;
     private static int dataset;
     private static String bulletinHeader;
     private static String bulletinOrigin;
@@ -42,7 +40,7 @@ public class WriteArgoBufr {
     private static String originatorSubCenterId;
     private static List<Sec3NprofMapDTO>sec3Sequences = new ArrayList<Sec3NprofMapDTO>();
     private static Properties props;
-    private static List<String> fileToBufr;
+    private static BufrTable bufrSequences;
 
     /**
      * Default constructor which can 't instantiate
@@ -68,15 +66,15 @@ public class WriteArgoBufr {
         String failedFtpFile = props.getProperty("ArgoBufr.failedFtpFile");
         String sendAuxData = props.getProperty("ArgoBufr.sendAuxData");
         boolean auxData = true;
+
         if (sendAuxData.trim().compareToIgnoreCase("false")==0){
         	auxData= false;
         	System.out.println(sendAuxData + " " + auxData);
 
         }
         GetListofInputFile fileListing = new GetListofInputFile(curentInputdir, ".nc", log);
-        List<String> fileToBufr = fileListing.getListOfFilesForBUFR();
-        System.out.println(argoTemplate);
-        bufrtable = new BufrTable(argoTemplate, log);
+        List<String> fileToBufr = fileListing.getListOfFilesForBUFR();        
+		
         if (new File (failedFtpFile).exists()){
         	 BufferedReader in = new BufferedReader(new FileReader(failedFtpFile));
         	 String str;
@@ -95,9 +93,8 @@ public class WriteArgoBufr {
         int fileId = 0;
         CreateBufrFile writeDataToFile = new CreateBufrFile(outFile, bulletinHeader,bulletinOrigin,
         		originatorCenterId, originatorSubCenterId, log);
-         
+        bufrSequences = new BufrTable(argoTemplate, log); 
         // convert netcdf file format to BUFR format
-        
         for (int i =0; i < fileToBufr.size(); i++) {
         	dataset = 0;
             if (fileToBufr.get(i).startsWith("R")) {
@@ -108,15 +105,18 @@ public class WriteArgoBufr {
                 	bncFile = null;
                 }
                 sec3Sequences = new ArrayList<Sec3NprofMapDTO>();
-                System.out.println("working on: " + netcdfFile + " and " +bncFile);
+                //System.out.println("working on: " + netcdfFile + " and " +bncFile);
                 log.info("Start write BUFR message for " + netcdfFile + " and " + bncFile);
                 dataset = dataset + 1;
-                ArgoBufrSection4 sec4 = new ArgoBufrSection4(netcdfFile, bncFile,auxData, bufrtable);
+                
+               
+                ArgoBufrSection4 sec4 = new ArgoBufrSection4(netcdfFile, bncFile,auxData, bufrSequences);
                 StringBuffer sbuf4 = new StringBuffer();
                 sbuf4 = sec4.getSbuf4();
                 log.info("total length of section 4 " + sbuf4.length()/8 + " octets");
                 //double sec4len = 4.0 + (sbuf4.length()/8.0);
                 sec3Sequences = sec4.getSec3Sequences();
+                
                 // there is a limit of 15000 octet per file. Create new
                 // file.  The total octet need for sec 0,1,3, 4 is 46 octets
                 fileId = fileId + 1;                

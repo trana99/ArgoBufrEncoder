@@ -17,6 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Hashtable;
 import java.util.List;
 
 import org.apache.logging.log4j.*;
@@ -25,40 +26,40 @@ import org.apache.logging.log4j.*;
  * BUFR Table class contain all of the information from BUFR template
  * @author Tran 25-Jul-06
  */
-public class BufrTable {
+public final class BufrTable {
     /**
      * List of descriptor to included in section 3
      */
-    private ArrayList <String>section3Code = new ArrayList<String>();
+    private static ArrayList <String>section3Code = new ArrayList<String>();
     /**
      * serverName that contain the oracle database
      */
-    private String serverName;
+    private static String serverName;
 
     /**
      * portNumber
      */
-    private String portNumber;
+    private static String portNumber;
 
     /**
      * username to access the oracle database
      */
-    private String username;
+    private static String username;
 
     /**
      * Password for accessing
      */
-    private String password;
+    private static String password;
 
     /**
      * sid
      */
-    private String sid;
+    private static String sid;
 
     /**
      * table name to access
      */
-    private String tablename;
+    private static String tablename;
 
     /**
      * driverName
@@ -67,7 +68,9 @@ public class BufrTable {
     private static Logger log;
     private static String dataType;
     private Connection connection = null;
-    private List<BufrDescriptorDto>descriptorsList = new ArrayList<BufrDescriptorDto>();
+    private static List<BufrDescriptorDto>descriptorsList = new ArrayList<BufrDescriptorDto>();
+    private static BufrDescriptorDto dto;
+    private static List<BufrDescriptorDto>childList;
     /**
      * Constructor for Bufr table
      * @param templatefile Bufr template
@@ -239,15 +242,97 @@ public class BufrTable {
      * @return
      */
     public List<BufrDescriptorDto> getChildSubset(String _parentDescriptor){
-    	List <BufrDescriptorDto> childList = new ArrayList<BufrDescriptorDto>();
+    	childList = new ArrayList<BufrDescriptorDto>();
     	for (int i = 0; i < descriptorsList.size(); i++){
     		if (descriptorsList.get(i).getDescriptor().compareToIgnoreCase(_parentDescriptor)==0){
     			childList.add(descriptorsList.get(i));
+    			//System.out.println(descriptorsList.get(i).getDescriptor_child() + " =" + descriptorsList.get(i).getData_width());
     		}
     	}
-
     	return childList;
     }
+	public List<BufrDescriptorDto> modifiedDescriptorValue(String _parentDescriptor) {
+		List<BufrDescriptorDto> _childDesc = getChildSubset(_parentDescriptor);
+		List<BufrDescriptorDto>mod_childDesc = new ArrayList<BufrDescriptorDto>();
+		int ref_value = 0;
+		int delta_data_width = 0;
+		int delta_scale =0;
+		Hashtable<String, Integer> nreference_value = new Hashtable<String, Integer> ();
+		Hashtable<String, Integer> ndelta_data_width = new Hashtable<String, Integer> ();
+		Hashtable<String, Integer> ndelta_scale = new Hashtable<String, Integer> ();
+		boolean startRef = false; // start to change the data reference for the subsequence sequences until stop
+		boolean startcdw = false;// start to change the data width for the subsequence sequences until stop
+		boolean startcs = false;// start to change the data scale for the subsequence sequences until stop
+		for (int i = 0; i < _childDesc.size(); i++) {
+			mod_childDesc.add(new BufrDescriptorDto(_childDesc.get(i)));
+			if (_childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("203")==0
+					&& _childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("255")!= 0) {
+				ref_value = _childDesc.get(i).getReference();				
+				startRef = true;
+			}
+			if (_childDesc.get(i).getDescriptor_child().compareToIgnoreCase("203255")==0) {
+				startRef = false;				
+			}
+			if (_childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("201")==0
+					&& _childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("000")!= 0) {
+				delta_data_width = getOperandYYY(_childDesc.get(i).getDescriptor_child());
+				startcdw = true;
+			}
+			if (_childDesc.get(i).getDescriptor_child().compareToIgnoreCase("201000")==0) {
+				startcdw = false;				
+			}
+			if (_childDesc.get(i).getDescriptor_child().substring(0, 3).compareToIgnoreCase("202")==0
+					&& _childDesc.get(i).getDescriptor_child().substring(3).compareToIgnoreCase("000")!= 0) {
+				delta_scale = getOperandYYY(_childDesc.get(i).getDescriptor_child());					
+				startcs = true;
+			}
+			if (_childDesc.get(i).getDescriptor_child().compareToIgnoreCase("202000")==0) {
+				startcs = false;				
+			}
+			
+			if (startRef && !isSimpleReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isDelayedReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isOperatorDescriptor(_childDesc.get(i).getDescriptor_child())) {
+				nreference_value.put(_childDesc.get(i).getDescriptor_child(), ref_value);
+			}
+			if (startcdw && !isSimpleReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isDelayedReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isOperatorDescriptor(_childDesc.get(i).getDescriptor_child())) {
+				ndelta_data_width.put(_childDesc.get(i).getDescriptor_child(), delta_data_width);
+			}
+			if (startcs && !isSimpleReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isDelayedReplicator(_childDesc.get(i).getDescriptor_child())
+					&& !isOperatorDescriptor(_childDesc.get(i).getDescriptor_child())) {
+				ndelta_scale.put(_childDesc.get(i).getDescriptor_child(), delta_scale);
+			}
+
+		}
+		for (int i =0; i < mod_childDesc.size(); i++) {
+			BufrDescriptorDto bu_dto =mod_childDesc.get(i);
+			 
+			if (!isSimpleReplicator(mod_childDesc.get(i).getDescriptor_child())
+					&& !isDelayedReplicator(mod_childDesc.get(i).getDescriptor_child())
+					&& !isOperatorDescriptor(mod_childDesc.get(i).getDescriptor_child())) {
+				if (nreference_value.containsKey(mod_childDesc.get(i).getDescriptor_child()) 
+						&& mod_childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
+					bu_dto.setReference(nreference_value.get(mod_childDesc.get(i).getDescriptor_child()));
+				}
+				if (ndelta_data_width.containsKey(mod_childDesc.get(i).getDescriptor_child())
+						&& mod_childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
+					bu_dto.setData_width(bu_dto.getData_width() + ndelta_data_width.get(_childDesc.get(i).getDescriptor_child()));					
+
+				}
+				if (ndelta_scale.containsKey(mod_childDesc.get(i).getDescriptor_child())
+						&& mod_childDesc.get(i).getMeds_pcode().compareToIgnoreCase("IGNORE")!= 0){
+					bu_dto.setScale(bu_dto.getScale() + ndelta_scale.get(_childDesc.get(i).getDescriptor_child()));
+				}
+			}
+			mod_childDesc.set(i, bu_dto);
+			log.debug("Modified descriptor " + bu_dto.getDescriptor_child() + " with data width = " 
+			+ bu_dto.getData_width() + " and refence value = " + bu_dto.getReference());
+		}
+		return mod_childDesc;
+	}
     public BufrDescriptorDto getDescriptorDto(String _descriptor){
     	BufrDescriptorDto dto = null;
     	for (int i = 0; i < descriptorsList.size();i++){
@@ -273,10 +358,11 @@ public class BufrTable {
         try {
             BufferedReader in = new BufferedReader(new FileReader(templatefile));
             String str;
+            descriptorsList = new ArrayList<BufrDescriptorDto>();
             str = in.readLine();
             while ((str = in.readLine()) != null) {
                 String[] value = str.split(",");
-                BufrDescriptorDto dto = new BufrDescriptorDto();
+                dto = new BufrDescriptorDto();
                 	int index = Integer.parseInt(value[0]);
                 	dto.setDescriptor_id(index);
                 	dto.setDescriptor(value[1]);
@@ -326,10 +412,12 @@ public class BufrTable {
                         dto.setNetcdf_bufr_conversion_eq(" ");
 
                     }
+                    log.debug("read " + dto.getDescriptor_child() + " =" + dto.getData_width());
                     descriptorsList.add(dto);
             }
             in.close();
         } catch (FileNotFoundException e) {
+        	log.error(e);
             System.err.println(e);
             e.printStackTrace();
             System.exit(1);

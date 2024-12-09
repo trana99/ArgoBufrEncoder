@@ -63,7 +63,7 @@ private void encode() {
     totalsec3.append(BufrUtility.completeSection(sec3,log));
     sec3 = new StringBuffer();
     sec3 = totalsec3;
-    log.info(totalsec3);
+    log.debug(totalsec3);
     log.info(
         "Complete encoded Section 3 of Bufr Message and total length = "
             + totalsec3.length()/8

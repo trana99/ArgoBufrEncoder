@@ -17,10 +17,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import java.util.ArrayList;
 
 import org.apache.logging.log4j.*;
-import org.jfree.util.Log;
 
 
 /**
